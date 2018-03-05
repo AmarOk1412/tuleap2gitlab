@@ -40,6 +40,8 @@ impl IssueRetriever {
         for issue in &selected_issues {
             // Retrieve base issue
             let details = tuleap.get_artifact_details(issue["id"].to_string());
+            let title: String = issue["title"].to_string();
+            let title = String::from(&title[1..(title.len()-1)]);
             let mut project_url: String = String::from(""); // for now store platform
             let mut labels: Vec<String> = Vec::new();
             let mut assignee: String = String::from("");
@@ -56,13 +58,18 @@ impl IssueRetriever {
                 let label = &v["label"];
                 if label == "Platform" {
                     project_url = v["values"][0]["label"].to_string();
+                    project_url = String::from(&project_url[1..(project_url.len()-1)])
                 } else if label == "Severity" {
-                    labels.push(v["values"][0]["label"].to_string());
+                    let severity =  v["values"][0]["label"].to_string();
+                    labels.push(String::from(&severity[1..(severity.len()-1)]));
                 } else if label == "Original Submission" {
                     description += "\n\n";
-                    description += &v["value"].to_string();
+                    let mut submission = v["value"].to_string();
+                    submission = submission.replace("\\r\\n", "\r\n");
+                    description += &submission[1..(submission.len()-1)];
                 } else if label == "Assigned to" {
                     assignee = v["values"][0]["display_name"].to_string();
+                    assignee = String::from(&assignee[1..(assignee.len()-1)])
                 }
             }
             // TODO get linked files?
@@ -78,22 +85,23 @@ impl IssueRetriever {
                 }
                 comment_txt += &sender[1..(sender.len()-1)];
                 comment_txt += "\n\n";
-                comment_txt += &comment["last_comment"]["body"].to_string();
+                let mut body = comment["last_comment"]["body"].to_string();
+                body = body.replace("\\r\\n", "\r\n");
+                comment_txt += &body[1..(body.len()-1)];
                 comments.push(comment_txt)
             }
             let issue = GitlabIssue {
-                id: issue["id"].to_string(),
-                title: issue["title"].to_string(),
+                title: title,
                 description: description,
                 assignee: assignee,
                 labels: labels,
                 project_url: project_url,
                 comments: comments
             };
-            println!("Title: {}\nDescription: {}\nAssignee: {}\nLabels: {}\nPlatform: {}\n", issue.title, issue.description, issue.assignee, issue.labels[0], issue.project_url);
+            /*println!("Title: {}\nDescription: {}\nAssignee: {}\nLabels: {}\nPlatform: {}\n", issue.title, issue.description, issue.assignee, issue.labels[0], issue.project_url);
             for comment in &issue.comments {
                 println!("{:?}", comment);
-            }
+            }*/
             gitlab_issues.push(issue);
         }
         gitlab_issues

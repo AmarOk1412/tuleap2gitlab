@@ -1,12 +1,10 @@
 use reqwest;
-
 use serde_json::{Value, from_str};
 
 pub struct TuleapClient {
     client: reqwest::Client,
     tracker_url: String,
     tracker_nb: u64
-
 }
 
 impl TuleapClient {
@@ -42,7 +40,6 @@ impl TuleapClient {
 
     pub fn get_artifact_details(&mut self, id: String) -> Value {
         let url = format!("{}/api/artifacts/{}", self.tracker_url, id);
-        println!("{:?}", url);
         let mut req = self.client.get(&*url)
                      .send().unwrap();
         let body = match req.text() {
@@ -54,7 +51,6 @@ impl TuleapClient {
 
     pub fn get_artifact_comments(&mut self, id: String) -> Vec<Value> {
         let url = format!("{}/api/artifacts/{}/changesets?fields=comments", self.tracker_url, id);
-        println!("{:?}", url);
         let mut req = self.client.get(&*url)
                      .send().unwrap();
         let body = match req.text() {
