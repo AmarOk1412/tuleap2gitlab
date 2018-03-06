@@ -2,15 +2,21 @@ use reqwest;
 use serde_json::{Value, from_str};
 use std::collections::HashMap;
 
+pub struct GitlabComment {
+    pub body: String,
+    pub created_at: String
+}
+
 pub struct GitlabIssue {
     pub title: String,
+    pub closed: bool,
     pub description: String,
     pub assignee: String,
     pub labels: Vec<String>,
     pub project_url: String,
-    pub comments: Vec<String>
+    pub created_at: String,
+    pub comments: Vec<GitlabComment>
 }
-
 
 pub struct GitlabClient {
     client: reqwest::Client,
@@ -40,7 +46,8 @@ impl GitlabClient {
         let mut post = HashMap::new();
         post.insert("title", issue.title.clone());
         post.insert("description", issue.description.clone());
-        post.insert("assignee", issue.assignee.clone());
+        post.insert("assignee_id", issue.assignee.clone());
+        post.insert("created_at", issue.created_at.clone());
         post.insert("labels", issue.labels[0].clone());
 
         // Create issue and retrieve iid
@@ -56,14 +63,25 @@ impl GitlabClient {
 
         // Post comments
         let url = format!("{}/api/v4/projects/{}/issues/{}/notes?private_token={}", self.gitlab_url, self.project, iid, self.private_token);
-        for comment in issue.comments.clone() {
+        for comment in issue.comments.iter() {
             println!("Post comment to issue {:?}", iid);
             let mut post = HashMap::new();
-            post.insert("body", comment);
+            post.insert("body", comment.body.clone());
+            post.insert("created_at", comment.created_at.clone());
 
             // Create issue and retrieve iid
             self.client.post(&*url)
                        .json(&post)
+                       .send().unwrap();
+        }
+
+        // Lock issue if done
+        if issue.closed {
+            let url = format!("{}/api/v4/projects/{}/issues/{}?private_token={}&state_event=close", self.gitlab_url, self.project, iid, self.private_token);
+            println!("{:?}", url);
+
+            // Create issue and retrieve iid
+            self.client.put(&*url)
                        .send().unwrap();
         }
     }
