@@ -7,3 +7,5 @@ authors = ["Sébastien Blin <sebastien.blin@savoirfairelinux.com>"]
 chrono = "*" # 0.4.0 lastest tested
 reqwest = "*" # 0.8.5 lastest tested
 serde_json = "*" # 1.0.10 latest tested
+log = "*" # 0.4.1 latest tested
+env_logger = "*" # 0.5.4 latest tested

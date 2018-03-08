@@ -1,4 +1,4 @@
 *.lock
 /target/
 **/*.rs.bk
-gitlabtoken
+config.json
