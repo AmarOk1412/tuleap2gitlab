@@ -26,6 +26,7 @@ impl IssueRetriever {
 
     /**
      * Get all issues not declined modified after the 1.0 release
+     * @return a vec of Json values from the API
      */
     pub fn select_issues(&self) -> Vec<Value> {
         let mut result : Vec<Value> = Vec::new();
@@ -45,6 +46,7 @@ impl IssueRetriever {
     /**
      * Migrate a text from tuleap to gitlab
      * @param string the text to migrate
+     * @return string cleaned
      */
     fn clean_txt(&self, string: String) -> String {
         // First avoid weird line breaks from tuleap
@@ -67,6 +69,8 @@ impl IssueRetriever {
 
     /**
      * Remove the first and last character if possible
+     * @param string the String to clean
+     * @return string without the first and last character
      */
     fn rm_first_and_last(&self, string: String) -> String {
         if string.len() < 2 {
@@ -78,6 +82,7 @@ impl IssueRetriever {
     /**
      * Prepare the migration via the tuleap client
      * @param tuleap the tuleap client
+     * @return a vec of GitlabIssue for a GitlabClient
      */
     pub fn tuleap_to_gitlab(&self, mut tuleap: TuleapClient) -> Vec<GitlabIssue> {
         let mut gitlab_issues: Vec<GitlabIssue> = Vec::new();

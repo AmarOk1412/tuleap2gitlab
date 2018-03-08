@@ -10,7 +10,7 @@ pub struct GitlabComment {
     pub body: String,
     pub created_at: String
 }
-
+// Used for println!
 impl fmt::Display for GitlabComment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {})", self.body, self.created_at)
@@ -30,7 +30,7 @@ pub struct GitlabIssue {
     pub created_at: String,
     pub comments: Vec<GitlabComment>
 }
-
+// Used for println!
 impl fmt::Display for GitlabIssue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} ({}) assigned to {}\n{}\n{}", self.title, self.closed, self.assignee, self.created_at, self.description)
@@ -59,6 +59,10 @@ impl GitlabClient {
         }
     }
 
+    /**
+     * Generate a gitlab issue on a tracker from the API
+     * @param issue to generate
+     */
     pub fn generate_issue(&self, issue: &GitlabIssue) {
         let url = format!("{}/api/v4/projects/{}/issues?private_token={}", self.gitlab_url, self.project, self.private_token);
 

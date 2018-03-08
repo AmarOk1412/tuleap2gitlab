@@ -23,6 +23,7 @@ impl TuleapClient {
 
     /**
      * Retrieve all artifacts from a tracker
+     * @return a vec of Json values from the API
      */
     pub fn get_artifacts(&mut self) -> Vec<Value> {
         let mut i = 0;
@@ -46,6 +47,8 @@ impl TuleapClient {
 
     /**
      * Retrieve a detailled artifact from a tracker
+     * @param id the id of the artifact
+     * @return a Json value from the API
      */
     pub fn get_artifact_details(&mut self, id: String) -> Value {
         let url = format!("{}/api/artifacts/{}", self.tracker_url, id);
@@ -60,6 +63,8 @@ impl TuleapClient {
 
     /**
      * Retrieve all comments from an artifact
+     * @param id the id of the artifact
+     * @return a vec of Json values from the API
      */
     pub fn get_artifact_comments(&mut self, id: String) -> Vec<Value> {
         let url = format!("{}/api/artifacts/{}/changesets?fields=comments", self.tracker_url, id);
