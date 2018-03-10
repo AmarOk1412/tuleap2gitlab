@@ -110,7 +110,7 @@ impl GitlabClient {
             Err(_) => String::from("")
         };
         let result: Value = from_str(&*body).ok().expect("request didn't return anything");
-        let iid = result["iid"].as_str().unwrap_or("");
+        let iid = result["iid"].as_u64().unwrap_or(0);
 
         // Post comments
         let url = format!("{}/api/v4/projects/{}/issues/{}/notes?private_token={}",
