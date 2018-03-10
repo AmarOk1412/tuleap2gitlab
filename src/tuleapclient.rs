@@ -34,12 +34,12 @@ impl TuleapClient {
         while !finish {
             let url = format!("{}/api/trackers/{}/artifacts?offset={}", self.tracker_url, self.tracker_nb, i*100);
             let mut req = self.client.get(&*url)
-                         .send().unwrap();
+                         .send().ok().expect("Failed to get artifacts");
             let body = match req.text() {
                 Ok(body) => body,
                 Err(_) => String::from("")
             };
-            let mut artifacts: Vec<Value> = from_str(&*body).unwrap();
+            let mut artifacts: Vec<Value> = from_str(&*body).ok().expect("Failed to parse artifacts");
             finish = artifacts.is_empty();
             all_artifacts.append(&mut artifacts);
             i += 1;
@@ -55,12 +55,12 @@ impl TuleapClient {
     pub fn get_artifact_details(&mut self, id: String) -> Value {
         let url = format!("{}/api/artifacts/{}", self.tracker_url, id);
         let mut req = self.client.get(&*url)
-                     .send().unwrap();
+                     .send().ok().expect("Failed to get artifact's details");
         let body = match req.text() {
             Ok(body) => body,
             Err(_) => String::from("")
         };
-        from_str(&*body).unwrap()
+        from_str(&*body).ok().expect("Failed to parse artifact's details")
     }
 
     /**
@@ -74,7 +74,7 @@ impl TuleapClient {
     pub fn get_file(&mut self, url: String, filename: String, file_dir: String, id: String) -> String {
         let url = format!("{}{}", self.tracker_url, url);
         let mut req = self.client.get(&*url)
-                     .send().unwrap();
+                     .send().ok().expect("Failed to get file");
         let mut buf: Vec<u8> = vec![];
         let _ = req.copy_to(&mut buf);
         let _ = create_dir("data");
@@ -85,8 +85,8 @@ impl TuleapClient {
             final_path = format!("{}/{}/{}{}",file_dir, i, id, filename);
             i += 1;
         }
-        let mut buffer = File::create(final_path.clone()).unwrap();
-        buffer.write(buf.as_slice()).unwrap();
+        let mut buffer = File::create(final_path.clone()).ok().expect("Failed to create file");
+        buffer.write(buf.as_slice()).ok().expect("Failed to write buffer");
         info!("create file: {}", final_path);
         String::from(final_path)
     }
@@ -99,11 +99,11 @@ impl TuleapClient {
     pub fn get_artifact_comments(&mut self, id: String) -> Vec<Value> {
         let url = format!("{}/api/artifacts/{}/changesets?fields=comments", self.tracker_url, id);
         let mut req = self.client.get(&*url)
-                     .send().unwrap();
+                     .send().ok().expect("Failed to get comments");
         let body = match req.text() {
             Ok(body) => body,
             Err(_) => String::from("")
         };
-        from_str(&*body).unwrap()
+        from_str(&*body).ok().expect("Failed to parse comments")
     }
 }

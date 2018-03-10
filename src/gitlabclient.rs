@@ -44,18 +44,16 @@ impl fmt::Display for GitlabIssue {
 pub struct GitlabClient {
     client: reqwest::Client,
     gitlab_url: String,
-    project: String,
     private_token: String,
 }
 
 impl GitlabClient {
-    pub fn new(gitlab_url: String, project: String, private_token: String) -> GitlabClient {
+    pub fn new(gitlab_url: String, private_token: String) -> GitlabClient {
         let client = reqwest::Client::new();
 
         GitlabClient {
             client: client,
             gitlab_url: gitlab_url,
-            project: project,
             private_token: private_token
         }
     }
@@ -65,28 +63,32 @@ impl GitlabClient {
      * @param issue to generate
      */
     pub fn generate_issue(&self, issue: &GitlabIssue) {
-        let url = format!("{}/api/v4/projects/{}/issues?private_token={}", self.gitlab_url, self.project, self.private_token);
+        let url = format!("{}/api/v4/projects/{}/issues?private_token={}",
+                          self.gitlab_url, issue.project_url, self.private_token);
 
         let mut description: String = issue.description.clone();
 
         for attachment in issue.attachments.clone() {
-            let url = format!("{}/api/v4/projects/{}/uploads?private_token={}", self.gitlab_url, self.project, self.private_token);
+            let url = format!("{}/api/v4/projects/{}/uploads?private_token={}",
+                             self.gitlab_url, issue.project_url, self.private_token);
 
             let form = reqwest::multipart::Form::new()
-                        .file("file", attachment.clone()).unwrap();
+                        .file("file", attachment.clone())
+                        .ok().expect("Failed to create form");
             let mut req = self.client.post(&*url)
                                  .multipart(form)
-                                 .send().unwrap();
+                                 .send()
+                                 .ok().expect("Failed to post attachment");
             let body = match req.text() {
                 Ok(body) => body,
                 Err(_) => String::from("")
             };
-            let result: Value = from_str(&*body).unwrap();
-            let md = result["markdown"].to_string();
+            let result: Value = from_str(&*body).ok().expect("request didn't return anything");
+            let md = result["markdown"].as_str().unwrap_or("");
             info!("Post new file: {}", attachment);
             debug!("{}", body);
             description += "  \n";
-            description += &md[1..(md.len()-1)];
+            description += md;
         }
 
         // Generate first post
@@ -102,16 +104,17 @@ impl GitlabClient {
         // Create issue and retrieve iid
         let mut req = self.client.post(&*url)
                                  .json(&post)
-                                 .send().unwrap();
+                                 .send().ok().expect("Failed to generate post");
         let body = match req.text() {
             Ok(body) => body,
             Err(_) => String::from("")
         };
-        let result: Value = from_str(&*body).unwrap();
-        let iid = result["iid"].to_string();
+        let result: Value = from_str(&*body).ok().expect("request didn't return anything");
+        let iid = result["iid"].as_str().unwrap_or("");
 
         // Post comments
-        let url = format!("{}/api/v4/projects/{}/issues/{}/notes?private_token={}", self.gitlab_url, self.project, iid, self.private_token);
+        let url = format!("{}/api/v4/projects/{}/issues/{}/notes?private_token={}",
+                          self.gitlab_url, issue.project_url, iid, self.private_token);
         for comment in issue.comments.iter() {
             let mut post = HashMap::new();
             post.insert("body", comment.body.clone());
@@ -122,17 +125,18 @@ impl GitlabClient {
             // Create issue and retrieve iid
             self.client.post(&*url)
                        .json(&post)
-                       .send().unwrap();
+                       .send().ok().expect("Failed to post comment");;
         }
 
         // Lock issue if done
         if issue.closed {
-            let url = format!("{}/api/v4/projects/{}/issues/{}?private_token={}&state_event=close", self.gitlab_url, self.project, iid, self.private_token);
+            let url = format!("{}/api/v4/projects/{}/issues/{}?private_token={}&state_event=close",
+                               self.gitlab_url, issue.project_url, iid, self.private_token);
             info!("Close issue {}", issue.title);
 
             // Create issue and retrieve iid
             self.client.put(&*url)
-                       .send().unwrap();
+                       .send().ok().expect("Failed to post close issue");;
         }
     }
 }

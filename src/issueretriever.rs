@@ -29,25 +29,6 @@ impl IssueRetriever {
     }
 
     /**
-     * Get all issues not declined modified after the 1.0 release
-     * @return a vec of Json values from the API
-     */
-    pub fn select_issues(&self) -> Vec<Value> {
-        let mut result : Vec<Value> = Vec::new();
-        let release_date = DateTime::parse_from_rfc3339("2017-07-21T00:00:00+02:00").unwrap();
-        for artifact in &self.all_artifacts {
-            let date = artifact["last_modified_date"].to_string();
-            let end = date.len() - 1;
-            let date = DateTime::parse_from_rfc3339(&date[1..end]).unwrap();
-            if artifact["status"] != "Declined"
-               && (date.timestamp() > release_date.timestamp()) {
-                result.push(artifact.clone());
-            }
-        }
-        result
-    }
-
-    /**
      * Migrate a text from tuleap to gitlab
      * @param string the text to migrate
      * @return string cleaned
@@ -91,9 +72,10 @@ impl IssueRetriever {
     pub fn tuleap_to_gitlab(&self, mut tuleap: TuleapClient) -> Vec<GitlabIssue> {
         let _ = remove_dir_all(self.file_dir.clone());
         let mut gitlab_issues: Vec<GitlabIssue> = Vec::new();
-        let selected_issues = self.select_issues();
+        let release_date = DateTime::parse_from_rfc3339("2017-07-21T00:00:00+02:00").unwrap();
+
         // TODO improve with threads
-        for issue in &selected_issues {
+        for issue in &self.all_artifacts {
             // Retrieve base issue
             let details = tuleap.get_artifact_details(issue["id"].to_string());
             let title = self.clean_txt(self.rm_first_and_last(issue["title"].to_string()));
@@ -113,45 +95,67 @@ impl IssueRetriever {
             description += &sender[1..(sender.len()-1)];
             description += "**";
             let values = &details["values"];
-            for v in values.as_array().unwrap() {
-                let label = &v["label"];
-                if label == "Platform" {
-                    project_url = v["values"][0]["label"].to_string();
-                    project_url = match self.project_map.get(&self.rm_first_and_last(project_url)) {
-                        Some(p) => p.clone(),
-                        None => String::from("")
-                    };
-                    project_url = self.rm_first_and_last(project_url);
-                } else if label == "Severity" {
-                    let severity =  v["values"][0]["label"].to_string();
-                    labels.push(self.rm_first_and_last(severity));
-                } else if label == "Original Submission" {
-                    description += "\n\n";
-                    let mut submission = v["value"].to_string();
-                    description += &self.clean_txt(self.rm_first_and_last(submission));
-                } else if label == "Status" {
-                    let mut status = v["values"][0]["label"].to_string();
-                    closed = &status[1..(status.len()-1)] == "Done";
-                } else if label == "Attachments" {
-                    let mut files_descriptions = &v["file_descriptions"];
-                    if !files_descriptions.is_array() {
-                        continue;
+            if values.is_array() {
+                for v in values.as_array().unwrap() {
+                    let label = &v["label"];
+                    if label == "Platform" {
+                        project_url = v["values"][0]["label"].to_string();
+                        project_url = match self.project_map.get(&self.rm_first_and_last(project_url)) {
+                            Some(p) => p.clone(),
+                            None => String::from("")
+                        };
+                        project_url = project_url;
+                    } else if label == "Severity" {
+                        let severity =  v["values"][0]["label"].to_string();
+                        match self.rm_first_and_last(severity).chars().next() {
+                            Some('1') => labels.push(String::from("S - Ordinary")),
+                            Some('5') => labels.push(String::from("S - Major")),
+                            Some('9') => labels.push(String::from("S - Critical")),
+                            _ => continue
+                        }
+                    } else if label == "Original Submission" {
+                        description += "\n\n";
+                        let mut submission = v["value"].to_string();
+                        description += &self.clean_txt(self.rm_first_and_last(submission));
+                    } else if label == "Status" {
+                        let status = v["values"][0]["label"].to_string();
+                        let status = &status[1..(status.len()-1)];
+                        closed = status == "Done" || status == "Declined";
+                        if status == "Declined" {
+                            labels.push(String::from("invalid"));
+                            info!("mark issue {} as Declined", issue["id"].as_str().unwrap_or(""));
+                        }
+                        if !closed {
+                            let date = details["last_modified_date"].to_string();
+                            let end = date.len() - 1;
+                            let date = DateTime::parse_from_rfc3339(&date[1..end]).unwrap_or(release_date);
+                            if date.timestamp() < release_date.timestamp() {
+                                labels.push(String::from("zombie"));
+                                closed = true;
+                                info!("mark issue {} as zombie", issue["id"].as_str().unwrap_or(""));
+                            }
+                        }
+                    } else if label == "Attachments" {
+                        let mut files_descriptions = &v["file_descriptions"];
+                        if !files_descriptions.is_array() {
+                            continue;
+                        }
+                        for desc in files_descriptions.as_array().unwrap() {
+                            let name = self.rm_first_and_last(desc["name"].to_string());
+                            let url = self.rm_first_and_last(desc["html_url"].to_string());
+                            attachments.push(tuleap.get_file(url,
+                                                             name,
+                                                             self.file_dir.clone(),
+                                                             issue["id"].to_string())
+                                            );
+                        }
+                    } else if label == "Assigned to" {
+                        assignee = v["values"][0]["username"].to_string();
+                        assignee = match self.assignees_map.get(&self.rm_first_and_last(assignee)) {
+                            Some(a) => a.clone(),
+                            None => String::from("")
+                        };
                     }
-                    for desc in files_descriptions.as_array().unwrap() {
-                        let name = self.rm_first_and_last(desc["name"].to_string());
-                        let url = self.rm_first_and_last(desc["html_url"].to_string());
-                        attachments.push(tuleap.get_file(url,
-                                                         name,
-                                                         self.file_dir.clone(),
-                                                         issue["id"].to_string())
-                                        );
-                    }
-                } else if label == "Assigned to" {
-                    assignee = v["values"][0]["username"].to_string();
-                    assignee = match self.assignees_map.get(&self.rm_first_and_last(assignee)) {
-                        Some(a) => a.clone(),
-                        None => String::from("")
-                    };
                 }
             }
             // Retrieve comments
