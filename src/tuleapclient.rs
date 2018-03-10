@@ -82,12 +82,12 @@ impl TuleapClient {
         let mut final_path = format!("{}/{}/{}",file_dir, id, filename);
         let mut i = 0;
         while metadata(final_path.clone()).is_ok() {
-            final_path = format!("{}/{}/{}{}",file_dir, i, id, filename);
+            final_path = format!("{}/{}/{}{}",file_dir, id, i, filename);
             i += 1;
         }
+        info!("create file: {}", final_path);
         let mut buffer = File::create(final_path.clone()).ok().expect("Failed to create file");
         buffer.write(buf.as_slice()).ok().expect("Failed to write buffer");
-        info!("create file: {}", final_path);
         String::from(final_path)
     }
 
