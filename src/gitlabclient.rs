@@ -59,6 +59,34 @@ impl GitlabClient {
     }
 
     /**
+     * Generate labels for each projects
+     */
+    pub fn generate_labels(&self, project_map: HashMap<String, String>, labels: &Value) {
+        if !labels.is_array() {
+            return;
+        }
+        for (_, gitlab_id) in project_map {
+            for label in labels.as_array().unwrap() {
+                let url = format!("{}/api/v4/projects/{}/labels?private_token={}",
+                                 self.gitlab_url, gitlab_id, self.private_token);
+                // Generate first post
+                let mut post = HashMap::new();
+                let name = label["name"].as_str().unwrap_or("");
+                let color = label["color"].as_str().unwrap_or("");
+                post.insert("name", name);
+                post.insert("color", color);
+                info!("Generate new label: {}/{}", name, color);
+
+                // Create issue and retrieve iid
+                let _ = self.client.post(&*url)
+                                   .json(&post)
+                                   .send().ok().expect("Failed to generate post");
+            }
+        }
+    }
+
+
+    /**
      * Generate a gitlab issue on a tracker from the API
      * @param issue to generate
      */

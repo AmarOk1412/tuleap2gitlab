@@ -62,15 +62,20 @@ fn main() {
         _ => {}
     }
 
+    let labels = &config["labels"];
+
     info!("Get interresting issues and build issues for gitlab");
     let retriever = IssueRetriever::new(tc.get_artifacts(),
-                                        assignees_map, projects_map,
+                                        assignees_map, projects_map.clone(),
                                         String::from(config["file_dir"].as_str().unwrap_or("")));
     let gitlab_issues = retriever.tuleap_to_gitlab(tc);
 
-    info!("Create gitlab issues");
     let gc = GitlabClient::new(String::from(config["gitlab_url"].as_str().unwrap_or("")),
                                String::from(config["gitlab_token"].as_str().unwrap_or("")));
+    info!("Create gitlab labels");
+    gc.generate_labels(projects_map, labels);
+
+    info!("Create gitlab issues");
     for issue in gitlab_issues {
         // TODO move into thread
         gc.generate_issue(&issue);
