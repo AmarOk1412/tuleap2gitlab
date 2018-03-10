@@ -46,7 +46,9 @@ fn main() {
                             String::from(p["gitlab_id"].as_str().unwrap()));
     }
     info!("Get interresting issues and build issues for gitlab");
-    let retriever = IssueRetriever::new(tc.get_artifacts(), assignees_map, projects_map);
+    let retriever = IssueRetriever::new(tc.get_artifacts(),
+                                        assignees_map, projects_map,
+                                        String::from(config["file_dir"].as_str().unwrap()));
     let gitlab_issues = retriever.tuleap_to_gitlab(tc);
 
     info!("Create gitlab issues");
@@ -60,7 +62,6 @@ fn main() {
 }
 
 // TODO
-// supports linked files
 // add correct labels
 // verify the rendered issues
 // avoid bad unwrapping

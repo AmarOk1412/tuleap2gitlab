@@ -1,5 +1,7 @@
 use reqwest;
 use serde_json::{Value, from_str};
+use std::io::prelude::*;
+use std::fs::{File, create_dir, metadata};
 
 /**
  * Represent a tuleap client use to manipulate the API
@@ -59,6 +61,34 @@ impl TuleapClient {
             Err(_) => String::from("")
         };
         from_str(&*body).unwrap()
+    }
+
+    /**
+     * Retrieve a file
+     * @param url the url of the file
+     * @param name the name of the file
+     * @param file_dir the base directory to save data
+     * @param id of the issue
+     * @return final path for the file
+     */
+    pub fn get_file(&mut self, url: String, filename: String, file_dir: String, id: String) -> String {
+        let url = format!("{}{}", self.tracker_url, url);
+        let mut req = self.client.get(&*url)
+                     .send().unwrap();
+        let mut buf: Vec<u8> = vec![];
+        let _ = req.copy_to(&mut buf);
+        let _ = create_dir("data");
+        let _ = create_dir(format!("{}/{}",file_dir, id));
+        let mut final_path = format!("{}/{}/{}",file_dir, id, filename);
+        let mut i = 0;
+        while metadata(final_path.clone()).is_ok() {
+            final_path = format!("{}/{}/{}{}",file_dir, i, id, filename);
+            i += 1;
+        }
+        let mut buffer = File::create(final_path.clone()).unwrap();
+        buffer.write(buf.as_slice()).unwrap();
+        info!("create file: {}", final_path);
+        String::from(final_path)
     }
 
     /**

@@ -28,7 +28,8 @@ pub struct GitlabIssue {
     pub labels: Vec<String>,
     pub project_url: String,
     pub created_at: String,
-    pub comments: Vec<GitlabComment>
+    pub comments: Vec<GitlabComment>,
+    pub attachments: Vec<String>
 }
 // Used for println!
 impl fmt::Display for GitlabIssue {
@@ -66,10 +67,32 @@ impl GitlabClient {
     pub fn generate_issue(&self, issue: &GitlabIssue) {
         let url = format!("{}/api/v4/projects/{}/issues?private_token={}", self.gitlab_url, self.project, self.private_token);
 
+        let mut description: String = issue.description.clone();
+
+        for attachment in issue.attachments.clone() {
+            let url = format!("{}/api/v4/projects/{}/uploads?private_token={}", self.gitlab_url, self.project, self.private_token);
+
+            let form = reqwest::multipart::Form::new()
+                        .file("file", attachment.clone()).unwrap();
+            let mut req = self.client.post(&*url)
+                                 .multipart(form)
+                                 .send().unwrap();
+            let body = match req.text() {
+                Ok(body) => body,
+                Err(_) => String::from("")
+            };
+            let result: Value = from_str(&*body).unwrap();
+            let md = result["markdown"].to_string();
+            info!("Post new file: {}", attachment);
+            debug!("{}", body);
+            description += "  \n";
+            description += &md[1..(md.len()-1)];
+        }
+
         // Generate first post
         let mut post = HashMap::new();
         post.insert("title", issue.title.clone());
-        post.insert("description", issue.description.clone());
+        post.insert("description", description);
         post.insert("assignee_id", issue.assignee.clone());
         post.insert("created_at", issue.created_at.clone());
         post.insert("labels", issue.labels[0].clone());

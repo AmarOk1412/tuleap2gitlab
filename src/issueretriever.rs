@@ -2,6 +2,7 @@ use chrono::prelude::*;
 use gitlabclient::{GitlabIssue, GitlabComment};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fs::remove_dir_all;
 use tuleapclient::TuleapClient;
 
 /**
@@ -10,17 +11,20 @@ use tuleapclient::TuleapClient;
 pub struct IssueRetriever {
     all_artifacts: Vec<Value>,
     assignees_map: HashMap<String, String>,
-    project_map: HashMap<String, String>
+    project_map: HashMap<String, String>,
+    file_dir: String
 }
 
 impl IssueRetriever {
     pub fn new(all_artifacts: Vec<Value>,
                assignees_map: HashMap<String, String>,
-               project_map: HashMap<String, String>) -> IssueRetriever {
+               project_map: HashMap<String, String>,
+               file_dir: String) -> IssueRetriever {
         IssueRetriever {
             all_artifacts: all_artifacts,
             assignees_map: assignees_map,
-            project_map: project_map
+            project_map: project_map,
+            file_dir: file_dir
         }
     }
 
@@ -85,6 +89,7 @@ impl IssueRetriever {
      * @return a vec of GitlabIssue for a GitlabClient
      */
     pub fn tuleap_to_gitlab(&self, mut tuleap: TuleapClient) -> Vec<GitlabIssue> {
+        let _ = remove_dir_all(self.file_dir.clone());
         let mut gitlab_issues: Vec<GitlabIssue> = Vec::new();
         let selected_issues = self.select_issues();
         // TODO improve with threads
@@ -95,6 +100,7 @@ impl IssueRetriever {
             let created_at = self.clean_txt(self.rm_first_and_last(issue["submitted_on"].to_string()));
             let mut project_url: String = String::from(""); // for now store platform
             let mut labels: Vec<String> = Vec::new();
+            let mut attachments: Vec<String> = Vec::new();
             let mut assignee: String = String::from("");
             let mut description = String::from("Issue generated from Tuleap's migration script.\n**Originally submitted by: ");
             let mut sender: String;
@@ -126,6 +132,20 @@ impl IssueRetriever {
                 } else if label == "Status" {
                     let mut status = v["values"][0]["label"].to_string();
                     closed = &status[1..(status.len()-1)] == "Done";
+                } else if label == "Attachments" {
+                    let mut files_descriptions = &v["file_descriptions"];
+                    if !files_descriptions.is_array() {
+                        continue;
+                    }
+                    for desc in files_descriptions.as_array().unwrap() {
+                        let name = self.rm_first_and_last(desc["name"].to_string());
+                        let url = self.rm_first_and_last(desc["html_url"].to_string());
+                        attachments.push(tuleap.get_file(url,
+                                                         name,
+                                                         self.file_dir.clone(),
+                                                         issue["id"].to_string())
+                                        );
+                    }
                 } else if label == "Assigned to" {
                     assignee = v["values"][0]["username"].to_string();
                     assignee = match self.assignees_map.get(&self.rm_first_and_last(assignee)) {
@@ -163,7 +183,8 @@ impl IssueRetriever {
                 labels: labels,
                 project_url: project_url,
                 created_at: created_at,
-                comments: comments
+                comments: comments,
+                attachments: attachments.clone()
             };
             gitlab_issues.push(issue);
         }
