@@ -125,7 +125,7 @@ impl GitlabClient {
         post.insert("description", description);
         post.insert("assignee_id", issue.assignee.clone());
         post.insert("created_at", issue.created_at.clone());
-        post.insert("labels", issue.labels[0].clone());
+        post.insert("labels", issue.labels.clone().join(","));
         info!("Generate new issue: {}", issue.title);
         debug!("{}", issue);
 
