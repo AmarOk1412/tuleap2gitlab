@@ -2,6 +2,7 @@ use reqwest;
 use serde_json::{Value, from_str};
 use std::collections::HashMap;
 use std::fmt;
+use std::panic;
 
 /**
  * Represent a gitlab comment
@@ -100,18 +101,26 @@ impl GitlabClient {
             let url = format!("{}/api/v4/projects/{}/uploads?private_token={}",
                              self.gitlab_url, issue.project_url, self.private_token);
 
-            let form = reqwest::multipart::Form::new()
-                        .file("file", attachment.clone())
-                        .ok().expect("Failed to create form");
-            let mut req = self.client.post(&*url)
-                                 .multipart(form)
-                                 .send()
-                                 .ok().expect("Failed to post attachment");
-            let body = match req.text() {
+            let form = reqwest::multipart::Form::new().file("file", attachment.clone());
+            match form {
+                Err(_) => { error!("ABORT {:?}", issue.title); return; },
+                _ => {}
+            }
+            let mut req = self.client.post(&*url).multipart(form.unwrap()).send();
+            match req {
+                Err(_) => return,
+                _ => {}
+            }
+            let body = match req.unwrap().text() {
                 Ok(body) => body,
                 Err(_) => String::from("")
             };
-            let result: Value = from_str(&*body).ok().expect("request didn't return anything");
+            let result = from_str(&*body);
+            match result {
+                Err(_) => { error!("ABORT {:?}", issue.title); return; },
+                _ => {}
+            }
+            let result: Value = result.unwrap();
             let md = result["markdown"].as_str().unwrap_or("");
             info!("Post new file: {}", attachment);
             debug!("{}", body);
@@ -130,14 +139,21 @@ impl GitlabClient {
         debug!("{}", issue);
 
         // Create issue and retrieve iid
-        let mut req = self.client.post(&*url)
-                                 .json(&post)
-                                 .send().ok().expect("Failed to generate post");
-        let body = match req.text() {
+        let req = self.client.post(&*url).json(&post).send();
+        match req {
+            Err(_) => { error!("ABORT {:?}", issue.title); return; },
+            _ => {}
+        }
+        let body = match req.unwrap().text() {
             Ok(body) => body,
             Err(_) => String::from("")
         };
-        let result: Value = from_str(&*body).ok().expect("request didn't return anything");
+        let result = from_str(&*body);
+        match result {
+            Err(_) => { error!("ABORT {:?}", issue.title); return; },
+            _ => {}
+        }
+        let result: Value = result.unwrap();
         let iid = result["iid"].as_u64().unwrap_or(0);
 
         // Post comments
@@ -151,9 +167,7 @@ impl GitlabClient {
             debug!("{}", comment);
 
             // Create issue and retrieve iid
-            self.client.post(&*url)
-                       .json(&post)
-                       .send().ok().expect("Failed to post comment");;
+            let _ = self.client.post(&*url).json(&post).send();
         }
 
         // Lock issue if done
@@ -163,8 +177,7 @@ impl GitlabClient {
             info!("Close issue {}", issue.title);
 
             // Create issue and retrieve iid
-            self.client.put(&*url)
-                       .send().ok().expect("Failed to post close issue");;
+            let _ = self.client.put(&*url).send();
         }
     }
 }
