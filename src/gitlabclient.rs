@@ -180,4 +180,32 @@ impl GitlabClient {
             let _ = self.client.put(&*url).send();
         }
     }
+
+    /**
+     * Remove all issues from the gitlab
+     * @note run this by doing cargo run clean
+     */
+    pub fn delete_all_issues(&self) {
+        let mut finish = false;
+        while !finish {
+            let url = format!("{}/api/v4/issues/?private_token={}&state=all&scope=all", self.gitlab_url, self.private_token);
+            let mut req = self.client.get(&*url)
+                         .send().ok().expect("Failed to get artifacts");
+            let body = match req.text() {
+                Ok(body) => body,
+                Err(_) => String::from("")
+            };
+            let issues: Vec<Value> = from_str(&*body).ok().expect("Failed to parse issues");
+            finish = issues.is_empty();
+            for issue in issues {
+                let url = format!("{}/api/v4/projects/{}/issues/{}?private_token={}",
+                                 self.gitlab_url, issue["project_id"], issue["iid"], self.private_token);
+                info!("Delete issue: {}/{}", issue["project_id"], issue["iid"]);
+
+                // Create issue and retrieve iid
+                let _ = self.client.delete(&*url)
+                                   .send().ok().expect("Failed to generate post");
+            }
+        }
+    }
 }

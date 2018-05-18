@@ -3,3 +3,4 @@
 **/*.rs.bk
 config.json
 data/
+gitlabtoken
