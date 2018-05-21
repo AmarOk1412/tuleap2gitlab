@@ -43,6 +43,7 @@ impl IssueRetriever {
         // protect json
         result = result.replace("\\\"", "\"");
         result = result.replace("\\\'", "'");
+        result = result.replace("&#39;", "'");
         // avoid markdown's symbols... cause tuleap is not in md
         result = result.replace("^", "\\^");
         result = result.replace("#", "\\#");
